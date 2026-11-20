@@ -1,0 +1,43 @@
+# Git history and metadata
+.git/
+.gitignore
+.github/
+
+# Dependencies
+node_modules/
+**/node_modules/
+vendor/
+**/vendor/
+
+# Build output
+dist/
+**/dist/
+build/
+**/build/
+target/
+**/target/
+
+# Environment files and credentials
+.env
+.env.*
+*.pem
+*.key
+id_rsa
+id_ed25519
+kubeconfig
+kubeconfig.*
+credentials
+secrets/
+**/secrets/
+
+# Backups and temporary files
+backups/
+*.backup
+*.bak
+*.log
+.DS_Store
+
+# Terraform local state
+.terraform/
+*.tfstate
+*.tfstate.*

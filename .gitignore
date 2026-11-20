@@ -1,0 +1,49 @@
+# Git
+.git/
+
+# Dependencies
+node_modules/
+**/node_modules/
+vendor/
+**/vendor/
+
+# Build output
+dist/
+**/dist/
+build/
+**/build/
+target/
+**/target/
+
+# Local backups
+backups/
+*.backup
+*.bak
+
+# Environment files and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+id_rsa
+id_ed25519
+kubeconfig
+kubeconfig.*
+credentials
+secrets/
+**/secrets/
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+
+# Logs and temporary files
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.DS_Store
