@@ -6,7 +6,10 @@ export function cartToItems(cart) {
 
 export function cartTotal(cart, menu) {
   const prices = Object.fromEntries(menu.map((dish) => [dish.name, dish.price]));
-  return Object.entries(cart).reduce((sum, [name, qty]) => sum + (prices[name] ?? 0) * qty, 0);
+  return Object.entries(cart).reduce(
+    (sum, [name, qty]) => sum + (prices[name] ?? 0) * qty,
+    0,
+  );
 }
 
 export function groupByStatus(orders) {
@@ -18,5 +21,7 @@ export function groupByStatus(orders) {
 }
 
 export function formatPrice(amount) {
-  return `$${amount.toFixed(2)}`;
+  return `Rs. ${Number(amount).toLocaleString('en-PK', {
+    maximumFractionDigits: 0,
+  })}`;
 }

@@ -33,9 +33,22 @@ services:
     environment: *env
     depends_on: [postgres, redis]
   stats-api:
-    build: { context: ../stats-api, args: { GIT_COMMIT: local } }
-    environment: *env
-    depends_on: [redis]
+    build:
+      context: ../stats-api
+      args:
+        GIT_COMMIT: local
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${STATS_APP_KEY:?export STATS_APP_KEY first}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_CLIENT: predis
+      CACHE_STORE: file
+      SESSION_DRIVER: file
+      QUEUE_CONNECTION: sync
+    depends_on:
+      - redis
   web:
     build: { context: ../web, args: { GIT_COMMIT: local } }
   gateway:

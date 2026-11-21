@@ -1,8 +1,8 @@
-name: Dhaba Glitch Mob CI
+name: Dhaba DevOps Platform CI/CD
 
 on:
   push:
-    branches: [main, "GM-*"]
+    branches: [main]
   pull_request:
     branches: [main]
 
@@ -21,6 +21,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
       - run: npm ci
       - run: npm run lint
       - run: npm test
@@ -90,3 +92,105 @@ jobs:
           DB_CONNECTION: sqlite
           DB_DATABASE: ":memory:"
       - run: vendor/bin/phpstan analyse --no-progress
+
+  publish-images:
+    name: Build and Push Docker Images to ECR
+    runs-on: ubuntu-latest
+    needs:
+      - web
+      - menu-api
+      - orders-api
+      - kitchen-worker
+      - stats-api
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: GitHubActionsDhabaECR
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push all six images
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          REPOSITORY="dhaba-devops-platform"
+
+          echo "Building Dhaba images with tag: ${IMAGE_TAG}"
+
+          # 1. Web frontend
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --build-arg GIT_COMMIT="${IMAGE_TAG}" \
+            --tag "${ECR_REGISTRY}/${REPOSITORY}/web:${IMAGE_TAG}" \
+            --push \
+            ./web
+
+          # 2. Menu API
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --build-arg GIT_COMMIT="${IMAGE_TAG}" \
+            --tag "${ECR_REGISTRY}/${REPOSITORY}/menu-api:${IMAGE_TAG}" \
+            --push \
+            ./menu-api
+
+          # 3. Orders API
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --build-arg GIT_COMMIT="${IMAGE_TAG}" \
+            --tag "${ECR_REGISTRY}/${REPOSITORY}/orders-api:${IMAGE_TAG}" \
+            --push \
+            ./orders-api
+
+          # 4. Kitchen Worker
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --build-arg GIT_COMMIT="${IMAGE_TAG}" \
+            --tag "${ECR_REGISTRY}/${REPOSITORY}/kitchen-worker:${IMAGE_TAG}" \
+            --push \
+            ./kitchen-worker
+
+          # 5. Stats API
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --build-arg GIT_COMMIT="${IMAGE_TAG}" \
+            --tag "${ECR_REGISTRY}/${REPOSITORY}/stats-api:${IMAGE_TAG}" \
+            --push \
+            ./stats-api
+
+          # 6. Operations Monitor
+          # Build context must be repository root.
+          docker buildx build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --build-arg VERSION="${IMAGE_TAG}" \
+            --file ops-monitor/Dockerfile \
+            --tag "${ECR_REGISTRY}/${REPOSITORY}/ops-monitor:${IMAGE_TAG}" \
+            --push \
+            .
+
+          echo "All six images successfully pushed."

@@ -1,171 +1,174 @@
 #!/usr/bin/env bash
-# Runs all monitoring checks and sends Slack alerts on state changes.
+# Runs monitoring checks and reports results to Kubernetes Job logs.
 # Sends a healthy summary every 30 minutes.
+
 set -uo pipefail
 
-NAMESPACE="ops"
-CONFIGMAP="ops-monitor-state"
-SUMMARY_INTERVAL=1800
+NAMESPACE="${OPS_NAMESPACE:-ops}"
+CONFIGMAP="${OPS_CONFIGMAP:-ops-monitor-state}"
+SUMMARY_INTERVAL="${SUMMARY_INTERVAL:-1800}"
 
-if [[ -z "${SLACK_WEBHOOK_URL:-}" ]]; then
-  echo "ERROR: SLACK_WEBHOOK_URL is not set"
-  exit 1
+FAILURES=0
+REPORT=""
+
+if [[ ! "$SUMMARY_INTERVAL" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: SUMMARY_INTERVAL must be a positive integer"
+    exit 1
 fi
 
-ok() { echo "OK    $*"; }
-fail() { echo "FAIL  $*"; }
+# Check required tools.
+for tool in kubectl jq curl date; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        echo "ERROR: Required tool is missing: $tool"
+        exit 1
+    fi
+done
 
-REPORT=""
-OVERALL_FAILURES=0
-
-run_check() {
-  local name="$1"
-  local script="$2"
-  local output
-  local rc
-
-  echo "Running $name..."
-
-  output=$("$script" 2>&1)
-  rc=$?
-
-  REPORT+=$'\n'"--- $name ---"$'\n'"$output"$'\n'
-
-  if (( rc != 0 )); then
-    OVERALL_FAILURES=$((OVERALL_FAILURES + 1))
-    fail "$name reported a problem"
-  else
-    ok "$name completed"
-  fi
+ok() {
+    echo "OK    $*"
 }
 
+fail() {
+    echo "FAIL  $*"
+}
+
+# Execute a monitoring script and capture its output.
+run_check() {
+    local name="$1"
+    local script="$2"
+    local output
+    local rc
+
+    echo
+    echo "Running $name..."
+
+    if [[ ! -x "$script" ]]; then
+        output="Monitoring script missing or not executable: $script"
+        rc=1
+    else
+        output=$("$script" 2>&1)
+        rc=$?
+    fi
+
+    REPORT+=$'\n'"--- $name ---"$'\n'"$output"$'\n'
+
+    if (( rc != 0 )); then
+        FAILURES=$((FAILURES + 1))
+        fail "$name reported a problem"
+    else
+        ok "$name completed successfully"
+    fi
+}
+
+# Run all monitoring checks.
 run_check "Cluster checks" "/opt/monitor/check-cluster.sh"
 run_check "Database checks" "/opt/monitor/check-databases.sh"
 run_check "Service checks" "/opt/monitor/check-services.sh"
 
 NOW=$(date +%s)
 
-if (( OVERALL_FAILURES > 0 )); then
-  NEW_STATE="FAIL"
+if (( FAILURES > 0 )); then
+    NEW_STATE="FAIL"
 else
-  NEW_STATE="OK"
+    NEW_STATE="OK"
 fi
 
-if ! STATE_DATA=$(kubectl -n "$NAMESPACE" get configmap "$CONFIGMAP" \
-  -o jsonpath='{.data.state}{"|"}{.data.last_summary}' 2>&1); then
-  echo "ERROR: Could not read monitoring state from ConfigMap"
-  echo "$STATE_DATA"
-  exit 1
+echo
+echo "Monitoring failures: $FAILURES"
+echo "New monitoring state: $NEW_STATE"
+
+# Read persisted monitoring state.
+if ! STATE_DATA=$(
+    kubectl -n "$NAMESPACE" get configmap "$CONFIGMAP" \
+        -o jsonpath='{.data.state}{"|"}{.data.last_summary}' 2>&1
+); then
+    echo "ERROR: Could not read monitoring state from ConfigMap"
+    echo "$STATE_DATA"
+    exit 1
 fi
 
 PREVIOUS_STATE="${STATE_DATA%%|*}"
 LAST_SUMMARY="${STATE_DATA#*|}"
 
 if [[ "$PREVIOUS_STATE" != "OK" && "$PREVIOUS_STATE" != "FAIL" ]]; then
-  echo "ERROR: Invalid monitoring state: $PREVIOUS_STATE"
-  exit 1
+    echo "ERROR: Invalid monitoring state"
+    exit 1
 fi
 
 if [[ ! "$LAST_SUMMARY" =~ ^[0-9]+$ ]]; then
-  echo "ERROR: Invalid last_summary value: $LAST_SUMMARY"
-  exit 1
+    echo "ERROR: Invalid last_summary value"
+    exit 1
 fi
 
-send_slack() {
-  local message="$1"
-  local payload
-
-  payload=$(jq -n --arg text "$message" '{text: $text}')
-
-  curl -fsS -X POST \
-    -H "Content-Type: application/json" \
-    --data "$payload" \
-    "$SLACK_WEBHOOK_URL" >/dev/null
-}
-
+# Update monitoring state in Kubernetes.
 update_state() {
-  local state="$1"
-  local summary_time="$2"
-  local patch
+    local state="$1"
+    local summary_time="$2"
+    local patch
 
-  patch=$(jq -n \
-    --arg state "$state" \
-    --arg summary "$summary_time" \
-    '{data: {state: $state, last_summary: $summary}}')
+    patch=$(jq -n \
+        --arg state "$state" \
+        --arg summary "$summary_time" \
+        '{data: {state: $state, last_summary: $summary}}'
+    ) || return 1
 
-  kubectl -n "$NAMESPACE" patch configmap "$CONFIGMAP" \
-    --type merge -p "$patch" >/dev/null
+    kubectl -n "$NAMESPACE" patch configmap "$CONFIGMAP" \
+        --type merge \
+        -p "$patch" >/dev/null
 }
 
+# Print complete check results to Kubernetes Job logs.
+echo
+echo "========== MONITORING REPORT =========="
+printf '%s\n' "$REPORT"
+
+# Handle state transitions and periodic healthy summaries.
 if [[ "$NEW_STATE" == "FAIL" && "$PREVIOUS_STATE" != "FAIL" ]]; then
 
-  MESSAGE="🚨 DhabaCart monitoring alert: problems detected.
+    echo "FAILURE DETECTED: monitoring state changed from OK to FAIL."
 
-$REPORT"
-
-  echo "Sending failure alert to Slack..."
-
-  if ! send_slack "$MESSAGE"; then
-    echo "ERROR: Slack alert failed"
-    exit 1
-  fi
-
-  if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
-    echo "ERROR: Could not update monitoring state in ConfigMap"
-    exit 1
-  fi
+    if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
+        echo "ERROR: Could not update monitoring state"
+        exit 1
+    fi
 
 elif [[ "$NEW_STATE" == "OK" && "$PREVIOUS_STATE" == "FAIL" ]]; then
 
-  MESSAGE="✅ DhabaCart monitoring recovery: all checks are passing again.
+    echo "RECOVERY DETECTED: monitoring state changed from FAIL to OK."
 
-$REPORT"
-
-  echo "Sending recovery notification to Slack..."
-
-  if ! send_slack "$MESSAGE"; then
-    echo "ERROR: Slack recovery notification failed"
-    exit 1
-  fi
-
-  if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
-    echo "ERROR: Could not update monitoring state in ConfigMap"
-    exit 1
-  fi
+    if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
+        echo "ERROR: Could not update monitoring state"
+        exit 1
+    fi
 
 elif [[ "$NEW_STATE" == "OK" ]]; then
 
-  if (( NOW - LAST_SUMMARY >= SUMMARY_INTERVAL )); then
+    if (( NOW - LAST_SUMMARY >= SUMMARY_INTERVAL )); then
+        echo "Healthy monitoring summary is due."
 
-    MESSAGE="✅ DhabaCart monitoring summary: all systems are healthy.
+        if ! update_state "$NEW_STATE" "$NOW"; then
+            echo "ERROR: Could not update monitoring state"
+            exit 1
+        fi
+    else
+        echo "Healthy. No periodic summary is due yet."
 
-$REPORT"
-
-    echo "Sending 30-minute healthy summary to Slack..."
-
-    if ! send_slack "$MESSAGE"; then
-      echo "ERROR: Slack summary failed"
-      exit 1
+        if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
+            echo "ERROR: Could not update monitoring state"
+            exit 1
+        fi
     fi
-
-    if ! update_state "$NEW_STATE" "$NOW"; then
-      echo "ERROR: Could not update monitoring state in ConfigMap"
-      exit 1
-    fi
-  else
-    if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
-      echo "ERROR: Could not update monitoring state in ConfigMap"
-      exit 1
-    fi
-    echo "Healthy. No summary notification is due yet."
-  fi
 
 else
-  echo "Problems continue. No duplicate failure alert sent."
-  if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
-    echo "ERROR: Could not update monitoring state in ConfigMap"
-    exit 1
-  fi
+
+    echo "FAILURE CONTINUES: no new state transition."
+
+    if ! update_state "$NEW_STATE" "$LAST_SUMMARY"; then
+        echo "ERROR: Could not update monitoring state"
+        exit 1
+    fi
+
 fi
 
+echo
 echo "Monitoring completed. State: $NEW_STATE"

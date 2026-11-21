@@ -2,21 +2,24 @@ import { describe, expect, it } from 'vitest';
 import { cartToItems, cartTotal, formatPrice, groupByStatus } from './lib.js';
 
 const menu = [
-  { id: 1, name: 'Biryani', price: 9 },
-  { id: 2, name: 'Garlic Naan', price: 1.5 },
+  { id: 1, name: 'Biryani', price: 450 },
+  { id: 2, name: 'Garlic Naan', price: 100 },
 ];
 
 describe('cart helpers', () => {
   it('drops dishes with quantity 0', () => {
-    expect(cartToItems({ Biryani: 2, 'Garlic Naan': 0 })).toEqual([{ name: 'Biryani', qty: 2 }]);
+    expect(cartToItems({ Biryani: 2, 'Garlic Naan': 0 })).toEqual([
+      { name: 'Biryani', qty: 2 },
+    ]);
   });
 
   it('adds up the total', () => {
-    expect(cartTotal({ Biryani: 2, 'Garlic Naan': 1 }, menu)).toBeCloseTo(19.5);
+    expect(cartTotal({ Biryani: 2, 'Garlic Naan': 1 }, menu)).toBe(1000);
   });
 
-  it('formats prices with two decimals', () => {
-    expect(formatPrice(9)).toBe('$9.00');
+  it('formats prices in Pakistani rupees', () => {
+    expect(formatPrice(1250)).toBe('Rs. 1,250');
+    expect(formatPrice(450)).toBe('Rs. 450');
   });
 });
 

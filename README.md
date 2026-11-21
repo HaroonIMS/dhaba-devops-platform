@@ -40,8 +40,6 @@ An additional `ops-monitor` image runs operational monitoring scripts.
 - Python, Go, Java, PHP and JavaScript
 - ShellCheck, Hadolint, Trivy and other testing tools
 - Prometheus and Grafana where applicable
-- Slack notifications
-- Jira project tracking
 
 ## Platform Architecture
 
@@ -56,7 +54,7 @@ The intended platform includes:
 - Kubernetes persistent volumes for PostgreSQL and Redis
 - Deployment rollback and smoke testing
 - Shell-based cluster, service and database monitoring
-- Slack alerts for failures, recovery and deployments
+- Kubernetes Job logs for monitoring reports
 
 ## Repository Structure
 
@@ -83,12 +81,21 @@ The intended platform includes:
 
 ## Project Status
 
-The application source code and initial infrastructure
-configurations are prepared.
+The application is running locally through Docker Compose.
 
-Infrastructure provisioning, pipeline implementation,
-deployment validation and monitoring will be documented
-as the project progresses.
+The local environment includes the web frontend, menu API,
+orders API, kitchen worker, statistics API, PostgreSQL,
+Redis and an Nginx gateway.
+
+The main application endpoints have been verified successfully.
+The monitoring scripts and Kubernetes monitoring CronJob are
+under development and validation.
+
+AWS deployment, ECR publishing, staging and production delivery,
+and full Prometheus/Grafana observability remain part of the
+ongoing implementation.
+
+This section will be updated as each milestone is completed.
 
 ## Security Principles
 
@@ -96,7 +103,7 @@ as the project progresses.
 - GitHub Actions should use short-lived AWS credentials through OIDC
   where supported.
 - Kubernetes credentials remain outside the repository.
-- Application passwords and webhook URLs are stored as secrets.
+- Application passwords and deployment credentials are stored securely.
 - Production changes should follow the documented delivery workflow.
 
 ## License

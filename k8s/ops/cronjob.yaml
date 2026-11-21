@@ -17,6 +17,16 @@ spec:
           serviceAccountName: ops-monitor
           restartPolicy: Never
 
+          imagePullSecrets:
+            - name: ecr-registry
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 999
+            runAsGroup: 999
+            seccompProfile:
+              type: RuntimeDefault
+
           containers:
             - name: ops-monitor
               image: dhaba-devops-platform/ops-monitor:latest
@@ -25,9 +35,26 @@ spec:
               command:
                 - /opt/monitor/ops-monitor.sh
 
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+
               env:
-                - name: SLACK_WEBHOOK_URL
-                  valueFrom:
-                    secretKeyRef:
-                      name: slack-webhook
-                      key: url
+                - name: SUMMARY_INTERVAL
+                  value: "1800"
+
+                - name: OPS_NAMESPACE
+                  value: ops
+
+                - name: OPS_CONFIGMAP
+                  value: ops-monitor-state
