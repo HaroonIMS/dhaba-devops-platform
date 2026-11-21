@@ -9,7 +9,7 @@ class StatsTest extends TestCase
 {
     public function test_health_is_ok(): void
     {
-        $this->getJson('/health')->assertOk()->assertJson(['status' => 'ok']);
+        $this->getJson('/api/health')->assertOk()->assertJson(['status' => 'ok']);
     }
 
     public function test_info_shows_version_and_pod(): void

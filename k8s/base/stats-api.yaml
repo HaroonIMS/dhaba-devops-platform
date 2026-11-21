@@ -47,18 +47,18 @@ spec:
               value: sync
           startupProbe:
             httpGet:
-              path: /health
+              path: /api/health
               port: http
             periodSeconds: 5
             failureThreshold: 36
           readinessProbe:
             httpGet:
-              path: /health
+              path: /api/health
               port: http
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /health
+              path: /api/health
               port: http
             periodSeconds: 20
           resources:
