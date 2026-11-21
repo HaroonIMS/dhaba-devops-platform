@@ -5,6 +5,8 @@ namespace: staging
 
 resources:
   - ../../base
+  - resourcequota.yaml
+  - limitrange.yaml
 
 images:
   - name: dhaba-devops-platform/web

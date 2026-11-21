@@ -6,6 +6,7 @@ resources:
   - rbac.yaml
   - configmap.yaml
   - cronjob.yaml
+  - resourcequota.yaml
 
 images:
   - name: dhaba-devops-platform/ops-monitor
