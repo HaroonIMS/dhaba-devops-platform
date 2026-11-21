@@ -17,8 +17,6 @@ spec:
           serviceAccountName: ops-monitor
           restartPolicy: Never
 
-          imagePullSecrets:
-            - name: ecr-registry
 
           securityContext:
             runAsNonRoot: true

@@ -14,8 +14,6 @@ spec:
       labels:
         app: web
     spec:
-      imagePullSecrets:
-        - name: ecr-registry
       containers:
         - name: web
           image: dhaba-devops-platform/web:latest

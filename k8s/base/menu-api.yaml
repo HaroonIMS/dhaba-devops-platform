@@ -14,8 +14,6 @@ spec:
       labels:
         app: menu-api
     spec:
-      imagePullSecrets:
-        - name: ecr-registry
       containers:
         - name: menu-api
           image: dhaba-devops-platform/menu-api:latest

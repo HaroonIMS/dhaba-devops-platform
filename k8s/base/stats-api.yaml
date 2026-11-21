@@ -14,8 +14,6 @@ spec:
       labels:
         app: stats-api
     spec:
-      imagePullSecrets:
-        - name: ecr-registry
       containers:
         - name: stats-api
           image: dhaba-devops-platform/stats-api:latest

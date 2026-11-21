@@ -14,8 +14,6 @@ spec:
       labels:
         app: kitchen-worker
     spec:
-      imagePullSecrets:
-        - name: ecr-registry
       containers:
         - name: kitchen-worker
           image: dhaba-devops-platform/kitchen-worker:latest

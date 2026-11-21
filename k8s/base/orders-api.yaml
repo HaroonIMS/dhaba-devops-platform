@@ -14,8 +14,6 @@ spec:
       labels:
         app: orders-api
     spec:
-      imagePullSecrets:
-        - name: ecr-registry
       containers:
         - name: orders-api
           image: dhaba-devops-platform/orders-api:latest
