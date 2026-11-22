@@ -79,23 +79,97 @@ The intended platform includes:
 └── web/
 ```
 
+
+
+## Infrastructure Monitoring and Observability
+
+The Dhaba DevOps Platform includes EC2 infrastructure monitoring using Prometheus, Node Exporter and Grafana.
+
+### Monitoring Architecture
+
+- **Node Exporter:** Runs on the AWS EC2 instance and collects CPU, memory, swap, filesystem, network, disk I/O and uptime metrics.
+- **SSH Tunnel:** Securely forwards the Node Exporter endpoint to the Ubuntu monitoring environment. Port 9100 is not publicly exposed.
+- **Prometheus:** Runs locally on Ubuntu and scrapes EC2 metrics every 15 seconds.
+- **Grafana:** Runs locally on Ubuntu and visualizes metrics collected by Prometheus.
+
+```text
+AWS EC2
+  |
+  v
+Node Exporter :9100
+  |
+  v
+SSH Tunnel
+  |
+  v
+Ubuntu Laptop
+  |
+  v
+Prometheus :9090
+  |
+  v
+Grafana :3000
+  |
+  v
+Dhaba Infrastructure Monitoring Dashboard
+```
+
+### Dashboard Preview
+
+The dashboard provides visibility into:
+
+- EC2 availability and uptime
+- CPU utilization and per-core activity
+- Memory and swap usage
+- Filesystem capacity
+- Network traffic
+- Disk read/write activity
+- System load averages
+
+![Dhaba Infrastructure Monitoring Dashboard](monitoring/grafana/dashboard-screenshot.png)
+
+### Dashboard Configuration
+
+The exported Grafana dashboard contains 28 elements, including 15 visualization panels and 13 row containers.
+
+The dashboard JSON is available at:
+
+`monitoring/grafana/dhaba-infrastructure-dashboard.json`
+
+It can be imported into another Grafana installation by configuring the Prometheus datasource and selecting the appropriate job and instance.
+
+### Dashboard Preview
+
+The dashboard provides visibility into:
+
+- EC2 availability and uptime
+- CPU utilization and per-core activity
+- Memory and swap usage
+- Filesystem capacity
+- Network traffic
+- Disk read/write activity
+- System load averages
+
+![Dhaba Infrastructure Monitoring Dashboard](monitoring/grafana/dashboard-screenshot.png)
+
+### Dashboard Configuration
+
+The exported Grafana dashboard contains 28 elements, including 15 visualization panels and 13 row containers.
+
+The dashboard JSON is available at:
+
+`monitoring/grafana/dhaba-infrastructure-dashboard.json`
+
+It can be imported into another Grafana installation by configuring the Prometheus datasource and selecting the appropriate job and instance.
 ## Project Status
 
-The application is running locally through Docker Compose.
+The application has been deployed to an AWS EC2-hosted K3s cluster. The public frontend is accessible through NodePort 30080, while backend APIs and data services remain private within the cluster.
 
-The local environment includes the web frontend, menu API,
-orders API, kitchen worker, statistics API, PostgreSQL,
-Redis and an Nginx gateway.
+GitHub Actions workflows run CI checks and publish container images to Amazon ECR. Automated deployment through these workflows is not currently implemented.
 
-The main application endpoints have been verified successfully.
-The monitoring scripts and Kubernetes monitoring CronJob are
-under development and validation.
+EC2 infrastructure monitoring is implemented using Node Exporter, Prometheus and Grafana. The Grafana dashboard configuration and screenshot are maintained in this repository.
 
-AWS deployment, ECR publishing, staging and production delivery,
-and full Prometheus/Grafana observability remain part of the
-ongoing implementation.
-
-This section will be updated as each milestone is completed.
+Further work includes expanding deployment automation, validating additional operational monitoring workflows and improving the platform's production readiness.
 
 ## Security Principles
 
