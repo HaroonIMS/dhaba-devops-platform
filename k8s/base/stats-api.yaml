@@ -37,6 +37,8 @@ spec:
               value: predis
             - name: REDIS_HOST
               value: redis
+            - name: REDIS_PORT
+              value: "6379"
             - name: SESSION_DRIVER
               value: file
             - name: CACHE_STORE
