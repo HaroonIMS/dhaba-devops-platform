@@ -1,184 +1,122 @@
 # Dhaba DevOps Platform
 
-An end-to-end DevOps engineering portfolio project that takes a
-microservices-based restaurant ordering application from source code
-to containerized, continuously delivered and monitored Kubernetes
-environments.
+An end-to-end DevOps portfolio project demonstrating how a microservices-based restaurant ordering application is containerized, tested, deployed to Kubernetes on AWS, and monitored.
 
-## Project
+## Project Overview
 
-Dhaba DevOps Platform demonstrates the design, implementation,
-deployment and operation of a Kubernetes-based microservices
-platform using modern DevOps practices.
-The platform demonstrates automated testing, containerization,
-AWS image publishing, Kubernetes orchestration, continuous delivery,
-persistent storage, monitoring, incident response and rollback.
+The platform combines application development with practical DevOps engineering:
+- Automated CI checks using GitHub Actions.
+- Docker image builds and publishing to Amazon ECR.
+- AWS authentication through GitHub Actions OIDC.
+- Remote deployment to an EC2-hosted K3s cluster using AWS Systems Manager.
+- Kubernetes workload management and persistent application storage.
+- Infrastructure monitoring with Node Exporter, Prometheus, and Grafana.
 
 ## Application Services
 
 | Service | Technology | Responsibility |
 |---|---|---|
-| web | React / Vite / Nginx | Ordering interface, kitchen screen and statistics |
-| menu-api | Python / FastAPI | Menu management and caching |
+| web | React / Vite / Nginx | Restaurant frontend |
+| menu-api | Python / FastAPI | Menu management |
 | orders-api | Go | Order processing |
 | kitchen-worker | Java / Spring Boot | Background order processing |
 | stats-api | PHP / Laravel | Restaurant statistics |
 | postgres | PostgreSQL | Persistent application data |
-| redis | Redis | Cache and background job queue |
+| redis | Redis | Caching and background job support |
 
-An additional `ops-monitor` image runs operational monitoring scripts.
+The repository also builds an `ops-monitor` image for operational monitoring scripts. It is not part of the five-service application deployment.
 
 ## Technology Stack
 
 - Linux and Bash
 - Git and GitHub
 - Docker and Docker Compose
-- AWS EC2 and Elastic Container Registry (ECR)
-- Kubernetes and Kustomize
 - GitHub Actions
+- AWS EC2, ECR, IAM OIDC, and Systems Manager
+- Kubernetes (K3s) and Kustomize
 - PostgreSQL and Redis
-- Python, Go, Java, PHP and JavaScript
-- ShellCheck, Hadolint, Trivy and other testing tools
-- Prometheus and Grafana where applicable
+- Prometheus and Node Exporter
+- Grafana
 
-## Platform Architecture
+## CI/CD Pipeline
 
-The intended platform includes:
+The GitHub Actions workflow performs the following:
 
-- Separate staging and production Kubernetes namespaces
-- Container images tagged with Git commit SHAs
-- Automated CI checks and unit tests
-- AWS ECR image publishing
-- Automated staging deployments
-- Controlled production releases
-- Kubernetes persistent volumes for PostgreSQL and Redis
-- Deployment rollback and smoke testing
-- Shell-based cluster, service and database monitoring
-- Kubernetes Job logs for monitoring reports
+1. Runs CI checks for the five application services.
+2. Builds and publishes six Docker images to Amazon ECR.
+3. Authenticates to AWS using GitHub OIDC short-lived credentials.
+4. Uses AWS Systems Manager to execute the deployment on the EC2 instance.
+5. Updates the five application Deployments to the commit-specific image tag.
+6. Waits for Kubernetes rollout completion.
 
-## Repository Structure
+Images are tagged with the Git commit SHA to make deployed versions traceable.
 
-```text
-.
-├── .github/workflows/
-├── db/
-├── dev/
-├── k8s/
-│   ├── base/
-│   ├── overlays/
-│   │   ├── staging/
-│   │   └── production/
-│   └── ops/
-├── kitchen-worker/
-├── menu-api/
-├── ops-monitor/
-├── orders-api/
-├── scripts/
-│   └── monitor/
-├── stats-api/
-└── web/
-```
+The deployment targets the `staging` namespace of the EC2-hosted K3s cluster.
 
+## Staging Environment
 
+- Kubernetes distribution: K3s
+- Hosting: AWS EC2
+- Namespace: `staging`
+- Frontend access: NodePort `30080`
+- Backend services: internal Kubernetes networking
+- PostgreSQL and Redis: private cluster services
 
-## Infrastructure Monitoring and Observability
+Frontend URL:
 
-The Dhaba DevOps Platform includes EC2 infrastructure monitoring using Prometheus, Node Exporter and Grafana.
+`http://54.206.106.165:30080/`
 
-### Monitoring Architecture
+The frontend health endpoint is:
 
-- **Node Exporter:** Runs on the AWS EC2 instance and collects CPU, memory, swap, filesystem, network, disk I/O and uptime metrics.
-- **SSH Tunnel:** Securely forwards the Node Exporter endpoint to the Ubuntu monitoring environment. Port 9100 is not publicly exposed.
-- **Prometheus:** Runs locally on Ubuntu and scrapes EC2 metrics every 15 seconds.
-- **Grafana:** Runs locally on Ubuntu and visualizes metrics collected by Prometheus.
+`http://54.206.106.165:30080/health`
 
-```text
-AWS EC2
-  |
-  v
-Node Exporter :9100
-  |
-  v
-SSH Tunnel
-  |
-  v
-Ubuntu Laptop
-  |
-  v
-Prometheus :9090
-  |
-  v
-Grafana :3000
-  |
-  v
-Dhaba Infrastructure Monitoring Dashboard
-```
+## Monitoring
 
-### Dashboard Preview
+Infrastructure monitoring uses:
+- Node Exporter on the EC2 instance.
+- Prometheus running on the local Ubuntu machine.
+- Grafana running locally.
+- SSH tunnelling to access the EC2 Node Exporter securely.
 
-The dashboard provides visibility into:
+The Grafana dashboard contains infrastructure monitoring panels for the Dhaba environment.
 
-- EC2 availability and uptime
-- CPU utilization and per-core activity
-- Memory and swap usage
-- Filesystem capacity
-- Network traffic
-- Disk read/write activity
-- System load averages
+**Dashboard:** Dhaba Infrastructure Monitoring Dashboard
 
-![Dhaba Infrastructure Monitoring Dashboard](monitoring/grafana/dashboard-screenshot.png)
-
-### Dashboard Configuration
-
-The exported Grafana dashboard contains 28 elements, including 15 visualization panels and 13 row containers.
-
-The dashboard JSON is available at:
+Dashboard configuration:
 
 `monitoring/grafana/dhaba-infrastructure-dashboard.json`
 
-It can be imported into another Grafana installation by configuring the Prometheus datasource and selecting the appropriate job and instance.
-
-### Dashboard Preview
-
-The dashboard provides visibility into:
-
-- EC2 availability and uptime
-- CPU utilization and per-core activity
-- Memory and swap usage
-- Filesystem capacity
-- Network traffic
-- Disk read/write activity
-- System load averages
+Dashboard screenshot:
 
 ![Dhaba Infrastructure Monitoring Dashboard](monitoring/grafana/dashboard-screenshot.png)
 
-### Dashboard Configuration
+## Documentation
 
-The exported Grafana dashboard contains 28 elements, including 15 visualization panels and 13 row containers.
+- [Architecture](docs/ARCHITECTURE.md)
+- [Deployment and Operations Runbook](docs/DEPLOYMENT-RUNBOOK.md)
 
-The dashboard JSON is available at:
+## Verified Project Status
 
-`monitoring/grafana/dhaba-infrastructure-dashboard.json`
+The latest successful deployment used commit:
 
-It can be imported into another Grafana installation by configuring the Prometheus datasource and selecting the appropriate job and instance.
-## Project Status
+`cdbf4c91a9fb51a1c07252aa35c1e2a5040e50e2`
 
-The application has been deployed to an AWS EC2-hosted K3s cluster. The public frontend is accessible through NodePort 30080, while backend APIs and data services remain private within the cluster.
+The deployment was verified through AWS Systems Manager and Kubernetes:
+- All five application Deployments were ready.
+- All seven application and data-service pods were running.
+- Application containers used the expected commit-specific image tag.
+- The frontend health endpoint returned HTTP 200.
 
-GitHub Actions workflows run CI checks and publish container images to Amazon ECR. Automated deployment through these workflows is not currently implemented.
+These checks describe the verified deployment at the time of the recorded validation.
 
-EC2 infrastructure monitoring is implemented using Node Exporter, Prometheus and Grafana. The Grafana dashboard configuration and screenshot are maintained in this repository.
+## Security Practices
 
-Further work includes expanding deployment automation, validating additional operational monitoring workflows and improving the platform's production readiness.
-
-## Security Principles
-
-- No AWS access keys or private credentials in Git.
-- GitHub Actions should use short-lived AWS credentials through OIDC
-  where supported.
-- Kubernetes credentials remain outside the repository.
-- Application passwords and deployment credentials are stored securely.
-- Production changes should follow the documented delivery workflow.
+- GitHub Actions uses OIDC for short-lived AWS credentials.
+- No long-lived AWS access keys are stored in the repository.
+- AWS Systems Manager is used for remote deployment.
+- Backend, database, and Redis services are not exposed through public NodePorts.
+- Node Exporter monitoring access uses an SSH tunnel.
+- Kubernetes and application credentials are kept outside source control.
 
 ## License
 

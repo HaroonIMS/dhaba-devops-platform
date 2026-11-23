@@ -11,16 +11,16 @@ resources:
 images:
   - name: dhaba-devops-platform/web
     newName: 374211129794.dkr.ecr.ap-southeast-2.amazonaws.com/dhaba-devops-platform/web
-    newTag: 8fbfffeb291be9793826a1563b98932dc28c1474
+    newTag: cdbf4c91a9fb51a1c07252aa35c1e2a5040e50e2
   - name: dhaba-devops-platform/menu-api
     newName: 374211129794.dkr.ecr.ap-southeast-2.amazonaws.com/dhaba-devops-platform/menu-api
-    newTag: 8fbfffeb291be9793826a1563b98932dc28c1474
+    newTag: cdbf4c91a9fb51a1c07252aa35c1e2a5040e50e2
   - name: dhaba-devops-platform/orders-api
     newName: 374211129794.dkr.ecr.ap-southeast-2.amazonaws.com/dhaba-devops-platform/orders-api
-    newTag: 8fbfffeb291be9793826a1563b98932dc28c1474
+    newTag: cdbf4c91a9fb51a1c07252aa35c1e2a5040e50e2
   - name: dhaba-devops-platform/kitchen-worker
     newName: 374211129794.dkr.ecr.ap-southeast-2.amazonaws.com/dhaba-devops-platform/kitchen-worker
-    newTag: 8fbfffeb291be9793826a1563b98932dc28c1474
+    newTag: cdbf4c91a9fb51a1c07252aa35c1e2a5040e50e2
   - name: dhaba-devops-platform/stats-api
     newName: 374211129794.dkr.ecr.ap-southeast-2.amazonaws.com/dhaba-devops-platform/stats-api
-    newTag: 8fbfffeb291be9793826a1563b98932dc28c1474
+    newTag: cdbf4c91a9fb51a1c07252aa35c1e2a5040e50e2
