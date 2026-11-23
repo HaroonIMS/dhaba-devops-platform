@@ -194,3 +194,113 @@ jobs:
             .
 
           echo "All six images successfully pushed."
+
+  deploy-staging:
+    name: Deploy to EC2 K3s Staging
+    runs-on: ubuntu-latest
+    needs: publish-images
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    concurrency:
+      group: dhaba-staging-deployment
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+          role-session-name: GitHubActionsDhabaCD
+
+      - name: Deploy images to K3s through AWS Systems Manager
+        env:
+          INSTANCE_ID: i-0e0e926b0826c278a
+          AWS_REGION: ap-southeast-2
+          IMAGE_REGISTRY: 374211129794.dkr.ecr.ap-southeast-2.amazonaws.com/dhaba-devops-platform
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          DEPLOY_SCRIPT=$(cat <<'REMOTE_SCRIPT'
+          set -euo pipefail
+
+          REPO="/home/ubuntu/dhaba-devops-platform"
+          SHA="__IMAGE_TAG__"
+          REGISTRY="__IMAGE_REGISTRY__"
+
+          echo "Checking deployment repository..."
+          if [ -n "$(sudo -u ubuntu git -C "$REPO" status --porcelain)" ]; then
+            echo "ERROR: EC2 repository has uncommitted changes. Refusing deployment."
+            exit 1
+          fi
+
+          echo "Fetching GitHub main..."
+          sudo -u ubuntu git -C "$REPO" fetch origin main
+
+          echo "Checking out deployment commit $SHA..."
+          sudo -u ubuntu git -C "$REPO" checkout --detach "$SHA"
+
+          echo "Deploying application services sequentially..."
+          for SERVICE in menu-api orders-api stats-api kitchen-worker web; do
+            echo "Updating $SERVICE to $SHA"
+            sudo k3s kubectl set image "deployment/$SERVICE" "$SERVICE=$REGISTRY/$SERVICE:$SHA" --namespace staging
+            sudo k3s kubectl rollout status "deployment/$SERVICE" --namespace staging --timeout=300s
+          done
+
+          echo "Final staging deployment status:"
+          sudo k3s kubectl get deployments --namespace staging
+          REMOTE_SCRIPT
+          )
+
+          DEPLOY_SCRIPT="$(printf '%s' "$DEPLOY_SCRIPT" | sed "s/__IMAGE_TAG__/$IMAGE_TAG/g; s#__IMAGE_REGISTRY__#$IMAGE_REGISTRY#g")"
+
+          PARAMETERS=$(jq -n --arg script "$DEPLOY_SCRIPT" '{commands: [$script]}')
+
+          echo "Starting SSM deployment for commit $IMAGE_TAG..."
+          COMMAND_ID=$(aws ssm send-command \
+            --region "$AWS_REGION" \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --comment "Dhaba staging deployment $IMAGE_TAG" \
+            --parameters "$PARAMETERS" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          echo "SSM command ID: $COMMAND_ID"
+
+          for ATTEMPT in $(seq 1 60); do
+            INVOCATION=$(aws ssm get-command-invocation \
+              --region "$AWS_REGION" \
+              --command-id "$COMMAND_ID" \
+              --instance-id "$INSTANCE_ID" 2>/dev/null || true)
+
+            if [ -z "$INVOCATION" ]; then
+              STATUS="Pending"
+            else
+              STATUS=$(jq -r '.Status // "Pending"' <<< "$INVOCATION")
+            fi
+
+            case "$STATUS" in
+              Success)
+                echo "Deployment completed successfully."
+                jq -r '.StandardOutputContent' <<< "$INVOCATION"
+                exit 0
+                ;;
+              Failed|TimedOut|Cancelled|Cancelling)
+                echo "Deployment failed with status: $STATUS"
+                jq -r '.StandardOutputContent, .StandardErrorContent' <<< "$INVOCATION"
+                exit 1
+                ;;
+              *)
+                echo "Deployment status: $STATUS (attempt $ATTEMPT/60)"
+                sleep 10
+                ;;
+            esac
+          done
+
+          echo "ERROR: Timed out waiting for SSM deployment command."
+          exit 1
